@@ -1,1 +1,1 @@
-# scrum_counter
+# Scrum counter
