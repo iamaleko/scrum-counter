@@ -12,7 +12,15 @@ function Assignee({ assignee, points, error }) {
     <li key={assignee.name} className={"assignee" + (error ? " assignee--error" : "")}>
       <img className="assignee__avatar" src={assignee.avatar} alt={assignee.name}/>
       <div className="assignee__name">{assignee.name}</div>
-      <div className="assignee__points">BE <b>{points.be}</b> FE <b>{points.fe}</b> QA <b>{points.qa}</b></div>
+      <div className="assignee__points">
+        {
+          Object.keys(points.groups)
+            .filter((group) => points.groups[group] > 0)
+            .map((group) => (
+              <> {group.toUpperCase()} <b>{points.groups[group]}</b></>
+            ))
+        }
+      </div>
       <div className={"assignee__points-total " + className}>{points.total}</div>
     </li>
   )
@@ -47,14 +55,12 @@ function Panel() {
       port = chrome.runtime.connect({ name: "panel" });
     });
 
+    const mixins = (import.meta.env.VITE_JIRA_SP_MIXINS || '').split('|').map((s) => s.split(','));
+
     chrome.runtime.onMessage.addListener((message) => {
       switch (message?.type) {
         case 'CounterCollectedData':
           const assignees = {};
-
-          let hasUnscoredIssues = false,
-            hasMixedScores = false,
-            hasMiscalculation = false;
 
           message.data.rows.forEach((row) => {
             if (ignoredTaskTypesSet.has(row.issue.type)) return;
@@ -64,38 +70,54 @@ function Panel() {
                 assignee: row.assignee,
                 points: {
                   total: 0,
-                  fe: 0,
-                  be: 0,
-                  qa: 0,
+                  groups: {},
                 },
                 error: false
               }
             }
             
             assignees[row.assignee.name].points.total += row.points.total;
-            assignees[row.assignee.name].points.fe += row.points.fe;
-            assignees[row.assignee.name].points.be += row.points.be;
-            assignees[row.assignee.name].points.qa += row.points.qa;
-
-            if (row.points.total === 0) {
-              setErrorUnscoredIssuesFound(true);
-              assignees[row.assignee.name].error = true;
-              hasUnscoredIssues = true;
-            }
-
-            if (row.points.qa > 0 && row.points.fe + row.points.be > 0) {
-              assignees[row.assignee.name].error = true;
-              hasMixedScores = true;
-            }
-
-            if (
-              (row.points.qa + row.points.fe + row.points.be > 0) &&
-              row.points.qa + row.points.fe + row.points.be !== row.points.total
-            ) {
-              assignees[row.assignee.name].error = true;
-              hasMiscalculation = true;
+            for (const group in row.points.groups) {
+              if (!(group in assignees[row.assignee.name].points.groups)) {
+                assignees[row.assignee.name].points.groups[group] = 0;
+              }
+              assignees[row.assignee.name].points.groups[group] += Number(row.points.groups[group]);
             }
           });
+
+          let hasUnscoredIssues = false,
+            hasMixedScores = false,
+            hasMiscalculation = false;
+
+          for (const name in assignees) {
+            const assignee = assignees[name];
+            if (assignee.points.total === 0) {
+              setErrorUnscoredIssuesFound(true);
+              assignee.error = true;
+              hasUnscoredIssues = true;
+            }
+            
+            const totalSum = Object.values(assignee.points.groups).reduce((a, v) => a + v, 0);
+            if (mixins.length && totalSum) {
+              let found = false;
+              for (const mixin of mixins) {
+                const mixinSum = mixin.reduce((a, group) => a + assignee.points.groups[group], 0);
+                if (mixinSum === totalSum) {
+                  found = true;
+                  break;
+                }
+              }
+              if (!found) {
+                assignee.error = true;
+                hasMixedScores = true;
+              }
+            }
+
+            if (totalSum > 0 && totalSum !== assignee.points.total) {
+              assignee.error = true;
+              hasMiscalculation = true;
+            }
+          }
 
           setErrorUnscoredIssuesFound(hasUnscoredIssues);
           setErrorMixedScoresFound(hasMixedScores);

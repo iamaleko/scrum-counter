@@ -65,10 +65,7 @@ window.ScrumCounter = class Counter {
           assigneeName = avatarEl?.alt.match(/^[^:]+?:\s(?<name>.+)$/)?.groups.name || "";
 
         // story points
-        const points = issueEl.querySelector(".ghx-summary")?.title.match(new RegExp(import.meta.env.VITE_JIRA_SP_REGEXP))?.groups,
-          pointsFE = Number(points?.fe || 0),
-          pointsBE = Number(points?.be || 0),
-          pointsQA = Number(points?.qa || 0),
+        const pointsGroups = issueEl.querySelector(".ghx-summary")?.title.match(new RegExp(import.meta.env.VITE_JIRA_SP_REGEXP))?.groups,
           pointsTotal = Number(issueEl.querySelector("aui-badge")?.innerText || 0);
 
         rows.push({
@@ -82,9 +79,7 @@ window.ScrumCounter = class Counter {
           },
           points: {
             total: pointsTotal,
-            fe: pointsFE,
-            be: pointsBE,
-            qa: pointsQA,
+            groups: pointsGroups,
           },
         })
       });
