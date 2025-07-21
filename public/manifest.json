@@ -1,0 +1,32 @@
+{
+  "name": "Scrum Counter",
+  "description": "Scrum Counter",
+  "version": "1.0",
+  "minimum_chrome_version": "116",
+  "manifest_version": 3,
+  "host_permissions": [
+    "*://%VITE_JIRA_HOST%/"
+  ],
+  "permissions": [
+    "activeTab",
+    "sidePanel",
+    "tabs",
+    "scripting",
+    "storage"
+  ],
+  "background": {
+    "service_worker": "assets/background.js"
+  },
+  "side_panel": {
+    "default_path": "panel.html"
+  },
+  "icons": {
+    "16": "assets/icon.png",
+    "32": "assets/icon.png",
+    "48": "assets/icon.png",
+    "128": "assets/icon.png"
+  },
+  "action": {
+    "default_icon": "assets/icon.png"
+  }
+}
