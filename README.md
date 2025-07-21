@@ -1,46 +1,51 @@
 # Scrum counter
 
-Расширение для Chrome с удобным счетчиком сторипоинтов Jira задач по разработчикам. Помогает быстро планировать спринты.
-Позволяет считать сторипоинты, записанные в произвольном формате в заголовках задач, добавленных в планируемый спринт.
+A Chrome extension with a convenient story points counter for Jira tasks grouped by developers. Helps with sprint planning.
+Allows counting story points written in any format within task titles added to the planned sprint.
 
 <img width="374" height="209" alt="Снимок экрана 2025-07-21 в 22 24 56" src="https://github.com/user-attachments/assets/a21facc8-14a6-40ef-9731-6b10aa6627da" />
 
-Расширение безопасно, не выполняет внешних сетевых запросов и никак не изменяет контент страниц Jira.
+The **extension is safe**, makes no external network requests, and doesn't modify Jira page content.
 
-## Фичи
+## Features
 
-- Запуск по клику на иконку только на разрешенном домене
-- Отображение счетчика в разбивке по разработчикам
-- Отображение аватарок и имен разработчиков
-- Парсинг числа сторипоинтов любым регулярным выражением с именованными направлениями
-- Отображение числа сторипоинтов по направлениям у каждого разработчика
-- Отображение суммы сторипоинтов у разработчика
-- Цветовая индикация превышения суммарного числа сторипоинтов
-- Информирование в случае смешивания сторипоинтов разных направлений
+- Launches only on allowed domains when clicking the icon;
+- Displays counter breakdown by developers;
+- Shows developer avatars and names;
+- Parses story points using provided regex with named capture groups;
+- Displays story points by specialization for each developer;
+- Shows total story points per developer;
+- Color-coded indicators for exceeding story point limits;
+- Warns when mixing story points from different specializations;
 
-## Установка и сборка
+## Installation and Build
 
-Склонируйте репозиторий, затем выполните в папке репозитория:
+Clone the repository, then run in the repo directory:
 ```
 npm i
 npm run build
 ```
 
-## Настройка
+## Configuration
 
-Переопределите необходимые переменные в `.env` и/или `.env.local` (прописан в `.gitignore`):
-- `VITE_JIRA_HOST` (пример `jira.example.com`) должна содержать домен вашей Jira;
-- `VITE_JIRA_TASK_IGNORE_TYPES` (пример `Retro AI,Sprint Goal`) позволяет через запятую указать типы Jira задач, которые будут игнорироваться при подсчетах;
-- `VITE_JIRA_SP_NORMAL` (пример `11`) задает число сторипоинтов на человека, до набора которого счетчик будет отображаться серым;
-- `VITE_JIRA_SP_TOO_MUCH` (пример `14`) задает число сторипоинтов на человека, до набора которого счетчик будет отображаться зеленым;
-- `VITE_JIRA_SP_WAY_TOO_MUCH` (пример `17`) задает число сторипоинтов на человека, до набора которого счетчик будет отображаться оранжевым, а при равном или большем количестве - красным;
-- `VITE_JIRA_SP_REGEXP` (пример `^\[(?<be>\d+),(?<fe>\d+)\]`) содержит регулярное выражение, описывающее шаблон указания сторипоинтов в заголовках Jira задач. Каждая группа в регулярном выражении представляет направление (специализацию, например фронтенд, тестирование, итд.), должна совпадать с целым числом и должна иметь **имя**. Имена используются для дальнейшего отображения в верстке. Регулярное выражение из примера предполагает, что заголовки ваших задач вы ведете в формате `[12,3] Любое имя задачи` где 12 это число сторипоинтов бэкенда (группа `be`), а 3 - число сторипоинтов фронтенда (группа `fe`). Если общее число сторипоинтов по направлениям не будет равно суммарному числу сторипоинтов в задачах разработчика, счетчик выведет предупреждение;
-- `VITE_JIRA_SP_MIXINS` (пример `qa|fe,be`) позволяет задать разрешенные сочетания сторипоинтов по направлениям. Сочетания состоят из направлений, указанных через запятую без пробелов, и разделяются вертикальной чертой. Строка в примере разрешает fe и be, но запрещает qa и fe или qa и be сторипоинты у одного разработчика. Если сочетания будут нарушены, счетчик выведет предупреждение. если фича не нужна - оставьте переменную пустой.
+Override necessary variables in `.env` and/or `.env.local` (included in .gitignore):
 
-После изменения настроек не забудьте выполнить `npm run build` и заново установить расширение.
+- `VITE_JIRA_HOST` (example `jira.example.com`) - your Jira domain;
+- `VITE_JIRA_TASK_IGNORE_TYPES` (example `Retro AI,Sprint Goal`) - comma-separated Jira task types to exclude from counting;
+- `VITE_JIRA_SP_NORMAL` (example `11`) - story points threshold below which counter appears gray;
+- `VITE_JIRA_SP_TOO_MUCH` (example `14`) - story points threshold below which counter appears green;
+- `VITE_JIRA_SP_WAY_TOO_MUCH` (example `17`) - story points threshold below which counter appears orange, above - red;
+- `VITE_JIRA_SP_REGEXP` (example `^\[(?<be>\d+),(?<fe>\d+)\]`) - regex pattern for parsing story points in Jira task titles. Each named group represents a specialization (e.g., backend, frontend). Example regex expects titles like `[12,3] Great jira task` where `12` is backend points (group `be`) and `3` is frontend points (group `fe`). If sum of specialized points doesn't match total, warning appears;
+- `VITE_JIRA_SP_MIXINS` (example `qa|fe,be`) - list of allowed specialization combinations (comma-separated without spaces, combinations separated by |). Example allows fe+be but prohibits qa+fe or qa+be. Leave empty to disable.
 
-## Использование
+After configuration changes, run `npm run build` and reinstall the extension.
 
-Установите билд как расширение в Chrome. Для этого откройте в Chrome страницу "Управление расширениями", затем в левом верхнем углу нажмите "Загрузить распакованное расширение" и выбирите папку `dist`.
-После этого нажатие на иконку расширения на скрам-борде в Jira с планируемым спринтом откроет панель и отобразит счетчик.
+## Usage
 
+Install the build as a Chrome extension:
+
+1. Open Chrome's "Manage Extensions"
+2. Click "Load unpacked extension" in top-left
+3. Select the `dist` folder
+
+Click the extension icon on Jira's sprint planning board to open the counter panel.
