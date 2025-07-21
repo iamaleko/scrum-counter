@@ -3,6 +3,10 @@ class Background {
   static tabIdsWithPanels = new Set();
   static tabIdsWithCounters = new Set();
 
+  static onActivatedHandler;
+  static onUpdatedHandler;
+  static onConnectHandler;
+
   static async loadState() {
     const data = await chrome.storage.session.get("tabIdsWith");
     if (data.tabIdsWith) {
@@ -13,58 +17,48 @@ class Background {
   }
 
   static async saveState() {
-    // const data = {
-    //   tabIdsWith: {
-    //     panels: [...this.tabIdsWithPanels],
-    //     counters: [...this.tabIdsWithCounters],
-    //   }
-    // };
-    // await chrome.storage.session.set(data);
-    // this.log(`Saved ${JSON.stringify(data.tabIdsWith)}`);
+    const data = {
+      tabIdsWith: {
+        panels: [...this.tabIdsWithPanels],
+        counters: [...this.tabIdsWithCounters],
+      }
+    };
+    await chrome.storage.session.set(data);
+    this.log(`Saved ${JSON.stringify(data.tabIdsWith)}`);
   }
 
-  static async onInstalled() {
-    this.log('Installed!');
+  static async addListeners() {
+    await this.loadState();
 
-    // await this.loadState();
-    // for (const cs of chrome.runtime.getManifest().content_scripts) {
-    //   for (const tab of await chrome.tabs.query({url: cs.matches})) {
-    //     if (tab.url.match(/(chrome|chrome-extension):\/\//gi)) {
-    //       continue;
-    //     }
-    //     const target = {tabId: tab.id, allFrames: cs.all_frames};
-    //     if (cs.js[0]) chrome.scripting.executeScript({
-    //       files: cs.js,
-    //       injectImmediately: cs.run_at === 'document_start',
-    //       world: cs.world, // requires Chrome 111+
-    //       target,
-    //     });
-    //     if (cs.css[0]) chrome.scripting.insertCSS({
-    //       files: cs.css,
-    //       origin: cs.origin,
-    //       target,
-    //     });
-    //   }
-    // }
-
-    chrome.runtime.onMessage.addListener((message) => this.onMessage(message));
+    if (this.onActivatedHandler) chrome.tabs.onActivated.removeListener(this.onActivatedHandler);
+    if (this.onUpdatedHandler) chrome.tabs.onUpdated.removeListener(this.onUpdatedHandler);
+    if (this.onConnectHandler) chrome.runtime.onConnect.removeListener(this.onConnectHandler);
 
     // manage panel availability and visibility
-    chrome.tabs.onActivated.addListener((info) => {
-      chrome.tabs.get(info.tabId, (tab) => this.updatePanel(tab))
-    });
-    chrome.tabs.onUpdated.addListener((tabId, info) => {
-      if (info.status === "complete") chrome.tabs.get(tabId, (tab) => this.updatePanel(tab))
-    });
+    chrome.tabs.onActivated.addListener(
+      this.onActivatedHandler = (info) => {
+        chrome.tabs.get(info.tabId, (tab) => this.updatePanel(tab))
+      }
+    );
+    chrome.tabs.onUpdated.addListener(
+      this.onUpdatedHandler = (tabId, info) => {
+        if (info.status === "complete") {
+          chrome.tabs.get(tabId, (tab) => this.updatePanel(tab));
+        }
+      }
+    );
 
     // manage panel opening
-    chrome.runtime.onConnect.addListener(async (port) => {
-      if (port.name !== "panel") return;
-      const tab = await this.getCurrentTab();
-      if (!tab) return;
-      await this.openPanel(tab);
-      port.onDisconnect.addListener(async () => this.closePanel(tab));
-    });
+    chrome.runtime.onConnect.addListener(
+      this.onConnectHandler = async (port) => {
+        if (port.name !== "panel") return;
+
+        const tab = await this.getCurrentTab();
+        if (!tab) return;
+        await this.openPanel(tab);
+        port.onDisconnect.addListener(async () => this.closePanel(tab));
+      }
+    );
 
     chrome.sidePanel.setPanelBehavior({
       openPanelOnActionClick: true,
@@ -73,21 +67,6 @@ class Background {
 
   static log(message) {
     console.log(message);
-  }
-
-  static onMessage(message) {
-    if (!message) return;
-    switch (message.type) {
-      case "CounterCollectedData":
-        this.log(`Data collected from tab ${message.data.tabId}`);
-        chrome.runtime.sendMessage({
-          type: "CounterCollectedData",
-          data: message.data
-        }).catch((e) => {
-          // Panel is not opened yet
-        });
-        break;
-    }
   }
 
   static async updatePanel(tab) {
@@ -137,15 +116,19 @@ class Background {
   static async enableCounter(tab) {
     if (!this.tabIdsWithPanels.has(tab.id)) return;
     await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      args: [ tab.id ],
-      func: (id) => {
-        window.tabId = id;
-      }
+      target: {
+        tabId: tab.id,
+      },
+      files: ["assets/content.js"]
     });
     await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      files: ["assets/content.js"]
+      target: {
+        tabId: tab.id,
+      },
+      args: [ tab.id ],
+      func: (tabId) => {
+        window.ScrumCounter.onInjected(tabId);
+      }
     });
     await chrome.tabs.sendMessage(tab.id, {
       type: "CounterStartCounting",
@@ -185,4 +168,4 @@ class Background {
   }
 }
 
-chrome.runtime.onInstalled.addListener(() => Background.onInstalled());
+Background.addListeners();

@@ -1,95 +1,101 @@
-if (!window.isInjected) {
-  class Counter {
-    static observer;
+window.ScrumCounter = class Counter {
+  static observer;
+  static tabId;
 
-    static onInjected() {
-      window.isInjected = true;
-      chrome.runtime.onMessage.addListener((message) => this.onMessage(message));
+  static onInjected(tabId) {
+    this.tabId = tabId;
+
+    if (window.ScrumCounterHandler) chrome.runtime.onMessage.removeListener(window.ScrumCounterHandler);
+    window.ScrumCounterHandler = (message) => this.onMessage(message);
+    chrome.runtime.onMessage.addListener(window.ScrumCounterHandler);
+    
+    this.log('Injected!', this.tabId);
+  }
+
+  static log(...message) {
+    console.log(...message);
+  }
+
+  static onMessage(message) {
+    if (!message) return;
+    switch (message.type) {
+      case "CounterStartCounting":
+        this.log('Command received:', message.type, message);
+        if (this.getCurrentTabId() !== message.data.tabId) return;
+        this.startCounting();
+        break;
+      case "CounterStopCounting":
+        this.log('Command received:', message.type, message);
+        this.stopCounting();
+        break;
     }
+  }
 
-    static log(...message) {
-      console.log(...message);
-    }
+  static getPlannedSprintEl() {
+    return document.querySelector(".ghx-sprint-planned");
+  }
 
-    static onMessage(message) {
-      if (!message) return;
-      switch (message.type) {
-        case "CounterStartCounting":
-          this.log('Command received:', message.type, message);
-          if (this.getCurrentTabId() !== message.data.tabId) return;
-          this.startCounting();
-          break;
-        case "CounterStopCounting":
-          this.log('Command received:', message.type, message);
-          this.stopCounting();
-          break;
-      }
-    }
+  static startCounting() {
+    let timeout;
+    if (!this.observer) this.observer = new MutationObserver(() => {
+      if (timeout) clearTimeout(timeout);
+      timeout = setTimeout(() => this.count(), 100);
+    });
+    this.observer.disconnect();
+    this.observer.observe(document.body, { childList: true, subtree: true });
+    this.count();
+  }
 
-    static getPlannedSprintEl() {
-      // return document.querySelector(".ghx-sprint-active");
-      return document.querySelector(".ghx-sprint-planned");
-    }
+  static stopCounting() {
+    if (this.observer) this.observer.disconnect();
+  }
 
-    static startCounting() {
-      let timeout;
-      if (!this.observer) this.observer = new MutationObserver(() => {
-        if (timeout) clearTimeout(timeout);
-        timeout = setTimeout(() => this.count(), 100);
+  static count() {
+    const rows = [];
+    const sprintEl = this.getPlannedSprintEl();
+    if (sprintEl) {
+      sprintEl.querySelectorAll(".js-issue:not(.ghx-filtered)").forEach((issueEl) => {
+        // issue
+        const issueType = issueEl.querySelector(".ghx-type")?.title || "",
+          issueId = Number(issueEl.dataset.issueId);
+
+        // assignee
+        const avatarEl = issueEl.querySelector(".ghx-avatar-img"),
+          assigneeAvatar = avatarEl?.src || "",
+          assigneeName = avatarEl?.alt.match(/^[^:]+?:\s(?<name>.+)$/)?.groups.name || "";
+
+        // story points
+        const points = issueEl.querySelector(".ghx-summary")?.title.match(new RegExp(import.meta.env.VITE_JIRA_SP_REGEXP))?.groups,
+          pointsFE = Number(points?.fe || 0),
+          pointsBE = Number(points?.be || 0),
+          pointsQA = Number(points?.qa || 0),
+          pointsTotal = Number(issueEl.querySelector("aui-badge")?.innerText || 0);
+
+        rows.push({
+          issue: {
+            type: issueType,
+            id: issueId,
+          },
+          assignee: {
+            avatar: assigneeAvatar,
+            name: assigneeName,
+          },
+          points: {
+            total: pointsTotal,
+            fe: pointsFE,
+            be: pointsBE,
+            qa: pointsQA,
+          },
+        })
       });
-      this.observer.disconnect();
-      this.observer.observe(document.body, { childList: true, subtree: true });
-      this.count();
     }
-
-    static stopCounting() {
-      if (this.observer) this.observer.disconnect();
+    this.log('Data collected:', rows);
+    if (!chrome.runtime) {
+      this.log('Connection was lost! Seppuku!');
+      this.stopCounting();
+      return;
     }
-
-    static count() {
-      const rows = [];
-      const sprintEl = this.getPlannedSprintEl();
-      if (sprintEl) {
-        sprintEl.querySelectorAll(".js-issue:not(.ghx-filtered)").forEach((issueEl) => {
-          // issue
-          const issueType = issueEl.querySelector(".ghx-type")?.title || "",
-            issueId = Number(issueEl.dataset.issueId);
-
-          // assignee
-          const avatarEl = issueEl.querySelector(".ghx-avatar-img"),
-            assigneeAvatar = avatarEl?.src || "",
-            assigneeName = avatarEl?.alt.match(/^[^:]+?:\s(?<name>.+)$/)?.groups.name || "";
-
-          // story points
-          const points = issueEl.querySelector(".ghx-summary")?.title.match(/^\s*\[\s*(?<be>\d+)\D+(?<fe>\d+)\D+(?<qa>\d+)?\s*\]/)?.groups,
-            pointsFE = Number(points?.fe || 0),
-            pointsBE = Number(points?.be || 0),
-            pointsQA = Number(points?.qa || 0),
-            pointsTotal = Number(issueEl.querySelector("aui-badge")?.innerText || 0);
-
-          rows.push({
-            issue: {
-              type: issueType,
-              id: issueId,
-            },
-            assignee: {
-              avatar: assigneeAvatar,
-              name: assigneeName,
-            },
-            points: {
-              total: pointsTotal,
-              fe: pointsFE,
-              be: pointsBE,
-              qa: pointsQA,
-            },
-          })
-        });
-      }
-      this.log('Data collected:', rows);
-      if (!chrome.runtime) {
-        this.log('Connection was lost! Seppuku!')
-        return;
-      }
+    try {
       chrome.runtime.sendMessage({
         type: "CounterCollectedData",
         data: {
@@ -97,12 +103,13 @@ if (!window.isInjected) {
           rows: rows,
         }
       });
-    }
-
-    static getCurrentTabId() {
-      return window.tabId;
+    } catch(e) {
+      this.log('Unable to send message! Seppuku!');
+      this.stopCounting();
     }
   }
 
-  Counter.onInjected();
-}
+  static getCurrentTabId() {
+    return this.tabId;
+  }
+};
