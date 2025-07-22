@@ -3,8 +3,6 @@
 A Chrome extension with a convenient story points counter for Jira tasks grouped by developers. Helps with sprint planning.
 Allows counting story points written in any format within task titles added to the planned sprint.
 
-<img width="374" height="209" alt="Снимок экрана 2025-07-21 в 22 24 56" src="https://github.com/user-attachments/assets/a21facc8-14a6-40ef-9731-6b10aa6627da" />
-
 The **extension is safe**, makes no external network requests, and doesn't modify Jira page content.
 
 ## Features
