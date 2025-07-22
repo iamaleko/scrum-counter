@@ -7,7 +7,7 @@ function Assignee({ assignee, points, error }) {
   if (points.total >= Number(import.meta.env.VITE_JIRA_SP_NORMAL)) className = "assignee__points-total--ok";
   if (points.total >= Number(import.meta.env.VITE_JIRA_SP_TOO_MUCH)) className = "assignee__points-total--too-much";
   if (points.total >= Number(import.meta.env.VITE_JIRA_SP_WAY_TOO_MUCH)) className = "assignee__points-total--way-too-much";
-
+  
   return (
     <li key={assignee.name} className={"assignee" + (error ? " assignee--error" : "")}>
       <img className="assignee__avatar" src={assignee.avatar} alt={assignee.name}/>
@@ -55,7 +55,8 @@ function Panel() {
       port = chrome.runtime.connect({ name: "panel" });
     });
 
-    const mixins = (import.meta.env.VITE_JIRA_SP_MIXINS || '').split('|').map((s) => s.split(','));
+    const regexp = import.meta.env.VITE_JIRA_SP_REGEXP;
+    const mixins = regexp ? (import.meta.env.VITE_JIRA_SP_MIXINS || '').split('|').map((s) => s.split(',')) : [];
 
     chrome.runtime.onMessage.addListener((message) => {
       switch (message?.type) {

@@ -65,7 +65,8 @@ window.ScrumCounter = class Counter {
           assigneeName = avatarEl?.alt.match(/^[^:]+?:\s(?<name>.+)$/)?.groups.name || "";
 
         // story points
-        const pointsGroups = issueEl.querySelector(".ghx-summary")?.title.match(new RegExp(import.meta.env.VITE_JIRA_SP_REGEXP))?.groups,
+        const regexp = import.meta.env.VITE_JIRA_SP_REGEXP;
+        const pointsGroups = regexp ? issueEl.querySelector(".ghx-summary")?.title.match(new RegExp(regexp))?.groups : {},
           pointsTotal = Number(issueEl.querySelector("aui-badge")?.innerText || 0);
 
         rows.push({
